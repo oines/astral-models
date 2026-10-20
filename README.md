@@ -1,4 +1,16 @@
-# Twilight AI
+# astral-models
+
+An Astral-focused fork of [Twilight AI](https://github.com/felinics/twilight).
+
+This repository builds on the original work of Twilight's authors and
+[contributors](https://github.com/felinics/twilight/graphs/contributors).
+The original [Apache License 2.0](LICENSE) and existing copyright notices are
+preserved unchanged.
+
+> The documentation below is retained from Twilight and currently describes the
+> upstream API, including its module path and installation commands.
+
+---
 
 A lightweight, idiomatic AI SDK for Go — inspired by [Vercel AI SDK](https://sdk.vercel.ai/).
 
