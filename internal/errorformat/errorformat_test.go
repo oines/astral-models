@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/felinics/twilight/internal/errorformat"
-	"github.com/felinics/twilight/provider/providertest"
-	"github.com/felinics/twilight/sdk"
+	sdk "github.com/oines/astral-models"
+	"github.com/oines/astral-models/internal/errorformat"
+	"github.com/oines/astral-models/internal/providertest"
 )
 
 func reqID(name, value string) http.Header {

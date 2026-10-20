@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/felinics/twilight/sdk"
+	sdk "github.com/oines/astral-models"
 )
 
 // ErrorDecoder fills Type, Code, Message and RequestID of e from e.Body and

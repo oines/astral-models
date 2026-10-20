@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/felinics/twilight/internal/reqheaders"
+	"github.com/oines/astral-models/internal/reqheaders"
 )
 
 // MergeHeaders returns a fresh map with canonical HTTP header names. Later
