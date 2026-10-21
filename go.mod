@@ -2,7 +2,7 @@ module github.com/oines/astral-models
 
 go 1.25.7
 
-require github.com/oines/astral-core v0.0.0-20261020151814-b22b71497b5f
+require github.com/oines/astral-core v0.0.0-20261021164907-a0cb8b3525af
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect

@@ -116,3 +116,7 @@ func (m *Model) Stream(ctx context.Context, req astral.Request, emit func(astral
 	}
 	return reply, models.ModelError(err)
 }
+
+func (m *Model) RecoverRequest(ctx context.Context, req astral.Request, cause error) (astral.Request, bool, error) {
+	return m.client.RecoverRequest(ctx, req, cause)
+}

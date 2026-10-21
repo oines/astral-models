@@ -183,3 +183,50 @@ func TestResponsesTerminalFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestEncryptedReasoningRecoveryKeepsToolResultsAndPlainHistory(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		output, _ := json.Marshal(ordered)
+		fmt.Fprintf(w, `{"id":"resp","status":"completed","output":%s}`, output)
+	}))
+	defer server.Close()
+	cfg := config()
+	streaming := false
+	cfg.Streaming = &streaming
+	cfg.BaseURL = server.URL
+	m, err := responses.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := request()
+	reply, err := m.Stream(context.Background(), req, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Messages = append(req.Messages, reply.Message, astral.Message{Role: astral.RoleTool, ToolCallID: "c1", Content: astral.Text("one")}, astral.Message{Role: astral.RoleTool, ToolCallID: "c2", Content: astral.Text("two")})
+	before, _ := json.Marshal(req)
+	repaired, changed, err := m.RecoverRequest(context.Background(), req, &models.APIError{StatusCode: 400, Message: "The encrypted content could not be verified."})
+	if err != nil || !changed {
+		t.Fatalf("expected recovery: %v %v", changed, err)
+	}
+	body, err := m.RequestBody(repaired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(body)
+	if strings.Contains(string(raw), "opaque-") || !strings.Contains(string(raw), "Looking.") || !strings.Contains(string(raw), `"output":"one"`) || !strings.Contains(string(raw), `"output":"two"`) {
+		t.Fatalf("incorrect recovery: %s", raw)
+	}
+	if len(repaired.Messages[1].ToolCalls()) != 2 {
+		t.Fatal("tool calls were dropped")
+	}
+	after, _ := json.Marshal(req)
+	if string(before) != string(after) {
+		t.Fatal("original history was mutated")
+	}
+	for _, cause := range []error{context.DeadlineExceeded, &models.APIError{StatusCode: 401, Message: "encrypted content could not be verified"}, &models.APIError{StatusCode: 400, Message: "invalid JSON"}, &models.APIError{StatusCode: 500, Code: "invalid_encrypted_content"}} {
+		if _, changed, err := m.RecoverRequest(context.Background(), req, cause); err != nil || changed {
+			t.Fatalf("unrelated error discarded state: %v", cause)
+		}
+	}
+}

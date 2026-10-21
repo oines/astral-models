@@ -17,6 +17,10 @@ const (
 	DeepSeek   Dialect = "deepseek"
 	Qwen       Dialect = "qwen"
 	OpenRouter Dialect = "openrouter"
+	Compatible Dialect = "compatible"
+	Anthropic  Dialect = "anthropic"
+	Google     Dialect = "google"
+	MiMo       Dialect = "mimo"
 )
 
 // Config binds one immutable model profile to a provider connection.
@@ -40,6 +44,9 @@ type Config struct {
 	// ImageTokenBudget is the host's conservative per-image input reservation.
 	// Estimation refuses images unless an explicit positive budget is supplied.
 	ImageTokenBudget int
+	// Codex selects the subscription Responses endpoint, which requires SSE
+	// and does not expose the public API's max_output_tokens parameter.
+	Codex bool
 }
 
 // ReasoningCapabilities describes a specific connection/protocol/model route.
@@ -63,4 +70,10 @@ type ModelInfo struct {
 
 func WithClientRequestID(ctx context.Context, id string) context.Context {
 	return reqheaders.WithClientRequestID(ctx, id)
+}
+
+// WithRequestHeaders adds host-owned request metadata, such as a stable coding
+// session ID. Headers are copied and never become part of model history.
+func WithRequestHeaders(ctx context.Context, headers map[string]string) context.Context {
+	return reqheaders.WithContext(ctx, headers)
 }

@@ -10,8 +10,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/ncruces/go-strftime v0.1.9 h1:bY0MQC28UADQmHmaF5dgpLmImcShSi2kHU9XLdhx/f4=
 github.com/ncruces/go-strftime v0.1.9/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
-github.com/oines/astral-core v0.0.0-20261020151814-b22b71497b5f h1:sUdZLx/tRGQt4V4V6XVCm95Ho+RbF/+VpJ9j1FYS3gE=
-github.com/oines/astral-core v0.0.0-20261020151814-b22b71497b5f/go.mod h1:U3ERvZRC6nstFf1DKCw0D45MchoXmcykwNzQlBOkxKo=
+github.com/oines/astral-core v0.0.0-20261021164907-a0cb8b3525af h1:5Dg8ejKyHXqRTZdu05uUwM62PjZn8QRd247F3Drp/bc=
+github.com/oines/astral-core v0.0.0-20261021164907-a0cb8b3525af/go.mod h1:U3ERvZRC6nstFf1DKCw0D45MchoXmcykwNzQlBOkxKo=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 h1:KRzFb2m7YtdldCEkzs6KqmJw4nqEVZGK7IN2kJkjTuQ=

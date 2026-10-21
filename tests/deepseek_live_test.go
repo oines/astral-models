@@ -14,8 +14,7 @@ import (
 	"testing"
 	"time"
 
-	astral "github.com/oines/astral-core"
-	"github.com/oines/astral-core/session"
+	"github.com/oines/astral-core"
 	"github.com/oines/astral-core/store/sqlite"
 	models "github.com/oines/astral-models"
 	"github.com/oines/astral-models/provider/openai/completions"

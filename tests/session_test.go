@@ -13,7 +13,6 @@ import (
 	"time"
 
 	astral "github.com/oines/astral-core"
-	"github.com/oines/astral-core/session"
 	"github.com/oines/astral-core/store/sqlite"
 	models "github.com/oines/astral-models"
 	"github.com/oines/astral-models/provider/openai/completions"
@@ -80,36 +79,38 @@ func TestDurableToolAndNoReplyRoundTrip(t *testing.T) {
 				return astral.ToolExecution{EndRun: &astral.RunEnd{Reason: "quiet"}}, nil
 			}}
 			db := filepath.Join(t.TempDir(), "history.db")
-			open := func() (*session.Manager, *sqlite.Store) {
+			open := func(existing bool) (*astral.Session, *sqlite.Store) {
 				st, err := sqlite.Open(db)
 				if err != nil {
 					t.Fatal(err)
 				}
-				manager, err := session.New(session.Config{Model: m, Store: st, Tools: []astral.Tool{lookup, quiet}, Retry: astral.RetryPolicy{MaxAttempts: 1},
+				config := astral.Config{Model: m, Store: st, Tools: []astral.Tool{lookup, quiet}, Retry: astral.RetryPolicy{MaxAttempts: 1},
 					Options: astral.GenerationOptions{Reasoning: astral.ReasoningOptions{Effort: "max"}},
 					EstimateTokens: func(ctx context.Context, _ astral.Model, req astral.Request) (int, error) {
 						return m.EstimateTokens(ctx, req)
 					},
-					Compaction: session.CompactionPolicy{Disabled: true}})
+					Compaction: astral.CompactionPolicy{Disabled: true}}
+				var chat *astral.Session
+				if existing {
+					chat, err = astral.OpenSession(context.Background(), config, "persisted")
+				} else {
+					chat, err = astral.NewSession(context.Background(), config, astral.SessionOptions{ID: "persisted"})
+				}
 				if err != nil {
 					_ = st.Close()
 					t.Fatal(err)
 				}
-				return manager, st
+				return chat, st
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			manager, store := open()
-			chat, err := manager.NewSession(ctx, session.SessionOptions{ID: "persisted"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			run := func(chat *session.Session, text string) astral.RunResult {
-				r, err := chat.Start(ctx, astral.User(text))
+			chat, store := open(false)
+			run := func(chat *astral.Session, text string) astral.RunResult {
+				r, err := chat.Prompt(ctx, astral.Input{ID: text, Message: astral.User(text)})
 				if err != nil {
 					t.Fatal(err)
 				}
-				result, err := r.Wait(ctx)
+				result, err := r.Run.Wait(ctx)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -123,19 +124,15 @@ func TestDurableToolAndNoReplyRoundTrip(t *testing.T) {
 			if !strings.Contains(first, `"effort":"max"`) || !strings.Contains(second, "cipher1") || !strings.Contains(second, "found") {
 				t.Fatalf("tool or options replay missing: %s", second)
 			}
-			if err := manager.Close(ctx); err != nil {
+			if err := chat.Close(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if err := store.Close(); err != nil {
 				t.Fatal(err)
 			}
-			manager, store = open()
+			chat, store = open(true)
 			defer store.Close()
-			defer manager.Close(context.Background())
-			chat, err = manager.OpenSession(ctx, "persisted")
-			if err != nil {
-				t.Fatal(err)
-			}
+			defer chat.Close(context.Background())
 			result := run(chat, "nothing needed")
 			if result.EndReason != "quiet" || calls.Load() != 3 {
 				t.Fatalf("control did not end the run: %+v calls=%d", result, calls.Load())

@@ -93,6 +93,12 @@ func stripImageBytes(value any) {
 			stripImageBytes(child)
 		}
 	case map[string]any:
+		if node["type"] == "base64" && node["media_type"] != nil {
+			node["data"] = "[image]"
+		}
+		if inline, ok := node["inlineData"].(map[string]any); ok {
+			inline["data"] = "[image]"
+		}
 		if node["type"] == "image_url" || node["type"] == "input_image" {
 			if _, ok := node["image_url"]; ok {
 				node["image_url"] = "[image]"

@@ -70,7 +70,7 @@ func (m *Model) RequestBody(req astral.Request) (map[string]any, error) {
 	}
 	flushImages()
 	body := map[string]any{"model": m.client.Config.Model, "messages": messages, "stream": m.client.Streaming(), "n": 1}
-	if m.client.Config.Dialect == models.DeepSeek || m.client.Config.Dialect == models.Qwen {
+	if m.client.Config.Dialect == models.DeepSeek || m.client.Config.Dialect == models.Qwen || m.client.Config.Dialect == models.Compatible || m.client.Config.Dialect == models.MiMo {
 		body["max_tokens"] = req.MaxOutputTokens
 	} else {
 		body["max_completion_tokens"] = req.MaxOutputTokens
@@ -228,7 +228,7 @@ func (m *Model) assistant(message astral.Message) (map[string]any, error) {
 
 func (m *Model) reasoning(body map[string]any, options astral.ReasoningOptions) error {
 	switch m.client.Config.Dialect {
-	case models.DeepSeek:
+	case models.DeepSeek, models.MiMo:
 		if options.Enabled != nil {
 			value := "disabled"
 			if *options.Enabled {

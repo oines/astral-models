@@ -21,6 +21,13 @@ type Model struct{ client *client.Client }
 var _ astral.Model = (*Model)(nil)
 
 func New(config models.Config) (*Model, error) {
+	if config.Codex {
+		streaming := true
+		if config.Streaming != nil && !*config.Streaming {
+			return nil, fmt.Errorf("%w: Codex requires streaming", astral.ErrInvalid)
+		}
+		config.Streaming = &streaming
+	}
 	c, err := client.New(config, Protocol)
 	if err != nil {
 		return nil, err
@@ -83,3 +90,7 @@ func (m *Model) Stream(ctx context.Context, req astral.Request, emit func(astral
 }
 
 func hasError(raw json.RawMessage) bool { return len(raw) > 0 && string(raw) != "null" }
+
+func (m *Model) RecoverRequest(ctx context.Context, req astral.Request, cause error) (astral.Request, bool, error) {
+	return m.client.RecoverRequest(ctx, req, cause)
+}

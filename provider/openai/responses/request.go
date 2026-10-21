@@ -53,6 +53,10 @@ func (m *Model) RequestBody(req astral.Request) (map[string]any, error) {
 	if req.SystemPrompt != "" {
 		body["instructions"] = req.SystemPrompt
 	}
+	if m.client.Config.Codex {
+		delete(body, "max_output_tokens")
+		body["instructions"] = req.SystemPrompt
+	}
 	if len(req.Tools) > 0 {
 		tools := make([]any, 0, len(req.Tools))
 		for _, tool := range req.Tools {

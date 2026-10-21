@@ -8,10 +8,12 @@ This is an Astral-focused fork of [Twilight AI](https://github.com/felinics/twil
 
 | Protocol | Dialects | Reasoning controls |
 | --- | --- | --- |
-| Chat Completions | OpenAI, DeepSeek, Qwen, OpenRouter | Native effort/toggle/budget fields for each dialect |
+| Chat Completions | OpenAI, DeepSeek, Qwen, OpenRouter, MiMo, compatible endpoints | Native effort/toggle/budget fields for each dialect |
 | Responses | OpenAI, DeepSeek | Native `reasoning.effort`, ordered native-item replay |
+| Anthropic Messages | Anthropic-compatible endpoints | Native thinking blocks, budgets and signed replay |
+| Google GenerateContent | Gemini-compatible endpoints | Native thinking configuration and thought signatures |
 
-Text, resolved image URLs/data URLs, function tools, streaming and non-streaming replies are supported. Unsupported input parts and unsupported options fail explicitly. Anthropic, Gemini, embedding, audio/video generation, and Twilight’s agent runtime are outside this fork’s current scope. Compatibility is model/endpoint-specific; see [verification results](docs/verification.md) for the tested DeepSeek routes and the limits of fixture coverage.
+Text, resolved image URLs/data URLs, function tools, streaming and non-streaming replies are supported. Unsupported input parts and unsupported options fail explicitly. Embedding, audio/video generation, and Twilight’s agent runtime are outside this fork’s current scope. Compatibility is model/endpoint-specific; see [verification results](docs/verification.md) for the tested DeepSeek routes and the limits of fixture coverage.
 
 ## Use
 
@@ -52,12 +54,13 @@ Token limits in this example are configuration values, not a model catalog. Supp
 
 ## Contracts
 
-- A `Stream` call makes one HTTP attempt and stops emitting before it returns. Core owns retries, tool execution, input queues, sessions, compaction, and forks.
+- A `Stream` call makes one HTTP attempt and stops emitting before it returns. Core's single `Session` implementation owns retries, tool execution, input queues, compaction, and forks. Ordinary generation and summaries share a total attempt budget; adapters never retry independently.
 - Host code owns credentials, catalogs, profile revisions, default/override selection, media resolution, and capability verification. Bind an immutable provider instance to each profile revision.
 - `GenerationOptions` preserves unset versus explicit zero/false. Effort names remain native values; the adapter does not invent a universal low/medium/high scale or convert effort to a token budget.
-- Protocol-specific JSON belongs in `ProviderOptions["openai-completions"]` or `ProviderOptions["openai-responses"]`. Conflicting fields and history/stream controls are rejected.
+- Protocol-specific JSON belongs under its protocol key in `ProviderOptions`: `openai-completions`, `openai-responses`, `anthropic-messages` or `google-generative-ai`. Conflicting fields and history/stream controls are rejected.
 - Responses items retain original order and opaque JSON, including encrypted reasoning, item/call IDs, annotations, and unknown fields. Chat retains the native reasoning payload, including late encrypted details. Display text cannot replace replay data.
 - Opaque state is bound to protocol, remote model, and replay scope. A route change fails explicitly. Set `ReplayScope` to the Host’s connection/credential revision; otherwise the library derives it from endpoint, key, and configured headers.
+- If a provider explicitly rejects its own encrypted reasoning or signature, `RecoverRequest` offers Core a copy with that opaque replay state removed. Core permits one repair within the same total attempt budget, rechecks its budget, and records both actual requests. Plain text, tool calls and results remain intact; durable history is unchanged. Authentication failures, timeouts and generic validation errors never trigger this removal. Failed stream fragments and retry diagnostics never become subsequent conversation or summary input.
 - `RequestBody` exposes the credential-free wire body. `EstimateTokens` uses a conservative JSON-byte estimate, requires an explicit `ImageTokenBudget` for images, and can be replaced by the Host’s model-specific estimator.
 - `Usage.Available` distinguishes missing usage from a reported zero. Optional cache/reasoning counts remain optional. `models.APIError` remains available through `errors.As`, with Core retry classification around it.
 

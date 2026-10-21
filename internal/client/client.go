@@ -37,7 +37,7 @@ func New(config models.Config, protocol string) (*Client, error) {
 	if config.Dialect == "" {
 		config.Dialect = models.OpenAI
 	}
-	if !slices.Contains([]models.Dialect{models.OpenAI, models.DeepSeek, models.Qwen, models.OpenRouter}, config.Dialect) {
+	if !slices.Contains([]models.Dialect{models.OpenAI, models.DeepSeek, models.Qwen, models.OpenRouter, models.Compatible, models.Anthropic, models.Google, models.MiMo}, config.Dialect) {
 		return nil, fmt.Errorf("%w: unsupported dialect %q", astral.ErrInvalid, config.Dialect)
 	}
 	config.Headers = utils.MergeHeaders(config.Headers)
@@ -75,6 +75,15 @@ func (c *Client) Options(ctx context.Context, path string, body any) *utils.Requ
 	var defaults map[string]string
 	if c.Config.APIKey != "" {
 		defaults = utils.AuthHeader(c.Config.APIKey)
+		switch c.Protocol {
+		case "anthropic-messages":
+			defaults = map[string]string{"X-Api-Key": c.Config.APIKey}
+		case "google-generative-ai":
+			defaults = map[string]string{"X-Goog-Api-Key": c.Config.APIKey}
+		}
+	}
+	if c.Protocol == "anthropic-messages" {
+		defaults = utils.MergeHeaders(map[string]string{"Anthropic-Version": "2023-06-01"}, defaults)
 	}
 	headers := utils.RequestHeaders(ctx, defaults, c.Config.Headers)
 	headers = utils.AddClientRequestID(ctx, headers, utils.ClientRequestIDHeader)
@@ -196,7 +205,7 @@ func (c *Client) ApplyExtensions(body map[string]any, req astral.Request) error 
 		switch key {
 		case "model", "messages", "input", "instructions", "tools", "stream", "stream_options",
 			"max_tokens", "max_completion_tokens", "max_output_tokens", "previous_response_id", "conversation",
-			"functions", "function_call", "background", "truncation":
+			"functions", "function_call", "background", "truncation", "system", "contents", "systemInstruction", "toolConfig":
 			return fmt.Errorf("%w: provider extension %q is owned by the request contract", astral.ErrInvalid, key)
 		}
 	}
