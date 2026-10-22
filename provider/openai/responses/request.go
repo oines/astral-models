@@ -1,7 +1,6 @@
 package responses
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -148,14 +147,8 @@ func (m *Model) assistantItem(part astral.Content) (any, error) {
 		if err := m.client.Replay(part, "responses.item"); err != nil {
 			return nil, err
 		}
-		native, err := decodeItem(part.Data, true)
-		if err != nil {
-			return nil, err
-		}
-		if native.Type != part.Type || native.Text != part.Text || !sameCall(native.ToolCall, part.ToolCall) {
-			return nil, fmt.Errorf("%w: edited assistant content does not match its native replay payload", astral.ErrInvalid)
-		}
-		// RawMessage retains item field order and unrecognized provider fields.
+		// The accepted native item is the replay authority. Parsed fields are
+		// projections for execution/display, not a second copy to reconcile.
 		return json.RawMessage(part.Data), nil
 	}
 	switch part.Type {
@@ -167,18 +160,6 @@ func (m *Model) assistantItem(part astral.Content) (any, error) {
 	default:
 		return nil, fmt.Errorf("%w: %q requires its native Responses replay item", astral.ErrInvalid, part.Type)
 	}
-}
-
-func sameCall(a, b *astral.ToolCall) bool {
-	if a == nil || b == nil {
-		return a == nil && b == nil
-	}
-	compact := func(raw json.RawMessage) []byte {
-		var out bytes.Buffer
-		_ = json.Compact(&out, raw)
-		return out.Bytes()
-	}
-	return a.ID == b.ID && a.Name == b.Name && bytes.Equal(compact(a.Arguments), compact(b.Arguments))
 }
 
 func decodeItem(raw json.RawMessage, complete bool) (astral.Content, error) {

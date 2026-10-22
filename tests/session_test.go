@@ -1,6 +1,7 @@
 package tests_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -40,20 +41,25 @@ func TestDurableToolAndNoReplyRoundTrip(t *testing.T) {
 				n := calls.Add(1)
 				w.Header().Set("Content-Type", "text/event-stream")
 				name, id := "lookup", "c1"
+				arguments := `{}`
+				if n == 1 {
+					arguments = `{"cmd":"pwd && echo \"---\" && ls -la","text":"<标签> & 原文","counter":9007199254740993}`
+				}
+				argumentString, _ := json.Marshal(arguments)
 				if n == 3 {
 					name, id = "no_reply", "quiet"
 				}
 				if protocol == completions.Protocol {
 					delta, finish := `{"content":"done"}`, "stop"
 					if n == 1 || n == 3 {
-						delta = fmt.Sprintf(`{"reasoning_details":[{"type":"reasoning.encrypted","id":"rs%d","data":"cipher%d"}],"tool_calls":[{"index":0,"id":%q,"type":"function","function":{"name":%q,"arguments":"{}"}}]}`, n, n, id, name)
+						delta = fmt.Sprintf(`{"reasoning_details":[{"type":"reasoning.encrypted","id":"rs%d","data":"cipher%d"}],"tool_calls":[{"index":0,"id":%q,"type":"function","function":{"name":%q,"arguments":%s}}]}`, n, n, id, name, argumentString)
 						finish = "tool_calls"
 					}
 					fmt.Fprintf(w, "data: {\"id\":\"r%d\",\"choices\":[{\"index\":0,\"delta\":%s,\"finish_reason\":%q}]}\n\ndata: [DONE]\n\n", n, delta, finish)
 				} else {
 					output := `[{"type":"message","id":"m","role":"assistant","content":[{"type":"output_text","text":"done","annotations":[]}]}]`
 					if n == 1 || n == 3 {
-						output = fmt.Sprintf(`[{"type":"reasoning","id":"rs%d","summary":[],"encrypted_content":"cipher%d"},{"type":"function_call","id":"f%d","call_id":%q,"name":%q,"arguments":"{}"}]`, n, n, n, id, name)
+						output = fmt.Sprintf(`[{"type":"reasoning","id":"rs%d","summary":[],"encrypted_content":"cipher%d","provider_counter":9007199254740993},{"type":"function_call","id":"f%d","call_id":%q,"name":%q,"arguments":%s}]`, n, n, n, id, name, argumentString)
 					}
 					fmt.Fprintf(w, "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"r%d\",\"status\":\"completed\",\"output\":%s}}\n\n", n, output)
 				}
@@ -71,7 +77,14 @@ func TestDurableToolAndNoReplyRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			lookup := astral.ToolFunc{Spec: astral.ToolDefinition{Name: "lookup", Version: "1", Parameters: json.RawMessage(`{"type":"object"}`)}, Run: func(context.Context, astral.Invocation, func(astral.ToolProgress)) (astral.ToolExecution, error) {
+			lookup := astral.ToolFunc{Spec: astral.ToolDefinition{Name: "lookup", Version: "1", Parameters: json.RawMessage(`{"type":"object"}`)}, Run: func(_ context.Context, invocation astral.Invocation, _ func(astral.ToolProgress)) (astral.ToolExecution, error) {
+				var args struct {
+					Cmd, Text string
+					Counter   json.Number
+				}
+				if err := json.Unmarshal(invocation.Call.Arguments, &args); err != nil || args.Cmd != `pwd && echo "---" && ls -la` || args.Text != "<标签> & 原文" || args.Counter.String() != "9007199254740993" {
+					t.Errorf("tool arguments changed: %s (%v)", invocation.Call.Arguments, err)
+				}
 				executions.Add(1)
 				return astral.ToolExecution{Result: &astral.ToolResult{Content: astral.Text("found"), Outcome: astral.OutcomeSucceeded}}, nil
 			}}
@@ -124,6 +137,11 @@ func TestDurableToolAndNoReplyRoundTrip(t *testing.T) {
 			if !strings.Contains(first, `"effort":"max"`) || !strings.Contains(second, "cipher1") || !strings.Contains(second, "found") {
 				t.Fatalf("tool or options replay missing: %s", second)
 			}
+			savedContext, err := chat.InspectContext(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			savedRequest, _ := json.Marshal(savedContext.Request)
 			if err := chat.Close(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -133,12 +151,36 @@ func TestDurableToolAndNoReplyRoundTrip(t *testing.T) {
 			chat, store = open(true)
 			defer store.Close()
 			defer chat.Close(context.Background())
+			restoredContext, err := chat.InspectContext(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			restoredRequest, _ := json.Marshal(restoredContext.Request)
+			if !bytes.Equal(savedRequest, restoredRequest) {
+				t.Fatal("SQLite reopen changed the complete model request")
+			}
 			result := run(chat, "nothing needed")
 			if result.EndReason != "quiet" || calls.Load() != 3 {
 				t.Fatalf("control did not end the run: %+v calls=%d", result, calls.Load())
 			}
-			if third := <-captured; !strings.Contains(third, "cipher1") {
-				t.Fatal("ciphertext lost on reopen")
+			third := <-captured
+			field := "input"
+			if protocol == completions.Protocol {
+				field = "messages"
+			}
+			var before, after map[string]json.RawMessage
+			_ = json.Unmarshal([]byte(second), &before)
+			_ = json.Unmarshal([]byte(third), &after)
+			var previous, restored []json.RawMessage
+			_ = json.Unmarshal(before[field], &previous)
+			_ = json.Unmarshal(after[field], &restored)
+			if len(restored) < len(previous) {
+				t.Fatal("reopen lost context")
+			}
+			for i, want := range previous {
+				if !bytes.Equal(want, restored[i]) {
+					t.Fatalf("reopen changed context item %d:\n%s\n%s", i, want, restored[i])
+				}
 			}
 			run(chat, "new work")
 			fourth := <-captured
