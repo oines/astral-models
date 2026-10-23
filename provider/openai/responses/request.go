@@ -91,32 +91,8 @@ func (m *Model) RequestBody(req astral.Request) (map[string]any, error) {
 		}
 		body["text"] = map[string]any{"format": wire}
 	}
-	reasoning := options.Reasoning
-	if reasoning.BudgetTokens != nil {
-		return nil, fmt.Errorf("%w: Responses reasoning uses effort, not a token budget", astral.ErrInvalid)
-	}
-	effort := reasoning.Effort
-	if reasoning.Enabled != nil {
-		if !*reasoning.Enabled {
-			caps := m.client.Config.Reasoning
-			if caps == nil || caps.OffEffort == "" {
-				return nil, fmt.Errorf("%w: disabling reasoning requires a verified off effort", astral.ErrInvalid)
-			}
-			if effort != "" && effort != caps.OffEffort {
-				return nil, fmt.Errorf("%w: disabled reasoning conflicts with effort %q", astral.ErrInvalid, effort)
-			}
-			effort = caps.OffEffort
-		} else if effort == "" {
-			caps := m.client.Config.Reasoning
-			if caps == nil || caps.DefaultOn == nil || !*caps.DefaultOn {
-				return nil, fmt.Errorf("%w: enabling reasoning requires an effort or a known enabled default", astral.ErrInvalid)
-			}
-		} else if caps := m.client.Config.Reasoning; caps != nil && effort == caps.OffEffort {
-			return nil, fmt.Errorf("%w: enabled reasoning conflicts with off effort", astral.ErrInvalid)
-		}
-	}
-	if effort != "" {
-		body["reasoning"] = map[string]any{"effort": effort}
+	if err := m.client.ApplyReasoning(body, req); err != nil {
+		return nil, err
 	}
 	if err := m.client.ApplyExtensions(body, req); err != nil {
 		return nil, err

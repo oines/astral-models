@@ -193,29 +193,8 @@ func (m *Model) RequestBody(req core.Request) (map[string]any, error) {
 			gen["responseJsonSchema"] = f.Schema
 		}
 	}
-	r := o.Reasoning
-	thinking := map[string]any{}
-	if r.BudgetTokens != nil && r.Effort != "" {
-		return nil, fmt.Errorf("%w: Gemini uses thinkingBudget or thinkingLevel, not both", core.ErrInvalid)
-	}
-	if r.Enabled != nil && !*r.Enabled {
-		if r.Effort != "" || r.BudgetTokens != nil && *r.BudgetTokens != 0 {
-			return nil, fmt.Errorf("%w: disabled thinking conflicts with selected budget/level", core.ErrInvalid)
-		}
-		thinking["thinkingBudget"] = 0
-	} else {
-		if r.Effort != "" {
-			thinking["thinkingLevel"] = r.Effort
-		}
-		if r.BudgetTokens != nil {
-			thinking["thinkingBudget"] = *r.BudgetTokens
-		}
-		if r.Enabled != nil || len(thinking) > 0 {
-			thinking["includeThoughts"] = true
-		}
-	}
-	if len(thinking) > 0 {
-		gen["thinkingConfig"] = thinking
+	if err := m.client.ApplyReasoning(body, req); err != nil {
+		return nil, err
 	}
 	if err := m.client.ApplyExtensions(body, req); err != nil {
 		return nil, err

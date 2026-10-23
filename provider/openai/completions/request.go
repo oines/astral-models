@@ -124,7 +124,7 @@ func (m *Model) RequestBody(req astral.Request) (map[string]any, error) {
 		}
 		body["response_format"] = wire
 	}
-	if err := m.reasoning(body, options.Reasoning); err != nil {
+	if err := m.client.ApplyReasoning(body, req); err != nil {
 		return nil, err
 	}
 	if err := m.client.ApplyExtensions(body, req); err != nil {
@@ -165,10 +165,28 @@ func (m *Model) assistant(message astral.Message) (map[string]any, error) {
 	wire := map[string]any{"role": "assistant", "content": nil}
 	var text strings.Builder
 	var calls []any
+	var nativeContent []any
+	hasNativeContent := false
 	for _, part := range message.Content {
+		if part.Type == "text" || part.Type == "reasoning" || part.Type == "provider" {
+			var stored struct {
+				Content []json.RawMessage `json:"content"`
+			}
+			if len(part.Data) > 0 && json.Unmarshal(part.Data, &stored) == nil && stored.Content != nil {
+				if err := m.client.Replay(part, "chat.content"); err != nil {
+					return nil, err
+				}
+				for _, block := range stored.Content {
+					nativeContent = append(nativeContent, block)
+				}
+				hasNativeContent = true
+				continue
+			}
+		}
 		switch part.Type {
 		case "text":
 			text.WriteString(part.Text)
+			nativeContent = append(nativeContent, map[string]string{"type": "text", "text": part.Text})
 		case "refusal":
 			wire["refusal"] = part.Text
 		case "reasoning":
@@ -211,6 +229,9 @@ func (m *Model) assistant(message astral.Message) (map[string]any, error) {
 	if text.Len() > 0 || len(calls) == 0 {
 		wire["content"] = text.String()
 	}
+	if hasNativeContent {
+		wire["content"] = nativeContent
+	}
 	if len(calls) > 0 {
 		wire["tool_calls"] = calls
 		if m.client.Config.RequireReasoningReplay || m.client.Config.Dialect == models.DeepSeek {
@@ -224,78 +245,4 @@ func (m *Model) assistant(message astral.Message) (map[string]any, error) {
 		}
 	}
 	return wire, nil
-}
-
-func (m *Model) reasoning(body map[string]any, options astral.ReasoningOptions) error {
-	switch m.client.Config.Dialect {
-	case models.DeepSeek, models.MiMo:
-		if options.Enabled != nil {
-			value := "disabled"
-			if *options.Enabled {
-				value = "enabled"
-			}
-			body["thinking"] = map[string]any{"type": value}
-		}
-		if options.Effort != "" {
-			body["reasoning_effort"] = options.Effort
-		}
-		if options.BudgetTokens != nil {
-			return fmt.Errorf("%w: DeepSeek Chat does not expose a thinking token budget", astral.ErrInvalid)
-		}
-	case models.Qwen:
-		if options.Enabled != nil {
-			body["enable_thinking"] = *options.Enabled
-		}
-		if options.BudgetTokens != nil {
-			body["thinking_budget"] = *options.BudgetTokens
-		}
-		if options.Effort != "" {
-			return fmt.Errorf("%w: Qwen Chat uses thinking_budget, not a universal effort scale", astral.ErrInvalid)
-		}
-	case models.OpenRouter:
-		reasoning := map[string]any{}
-		if options.Enabled != nil {
-			reasoning["enabled"] = *options.Enabled
-		}
-		if options.Effort != "" {
-			reasoning["effort"] = options.Effort
-		}
-		if options.BudgetTokens != nil {
-			if options.Effort != "" {
-				return fmt.Errorf("%w: OpenRouter accepts effort or max_tokens, not both", astral.ErrInvalid)
-			}
-			reasoning["max_tokens"] = *options.BudgetTokens
-		}
-		if len(reasoning) > 0 {
-			body["reasoning"] = reasoning
-		}
-	default:
-		if options.BudgetTokens != nil {
-			return fmt.Errorf("%w: OpenAI Chat has no thinking token budget", astral.ErrInvalid)
-		}
-		effort := options.Effort
-		if options.Enabled != nil {
-			capabilities := m.client.Config.Reasoning
-			if *options.Enabled {
-				if capabilities != nil && effort != "" && effort == capabilities.OffEffort {
-					return fmt.Errorf("%w: reasoning-on conflicts with the off effort", astral.ErrInvalid)
-				}
-				if effort == "" && (capabilities == nil || capabilities.DefaultOn == nil || !*capabilities.DefaultOn) {
-					return fmt.Errorf("%w: enabling reasoning needs an explicit effort or a verified reasoning default", astral.ErrInvalid)
-				}
-			} else {
-				if capabilities == nil || capabilities.OffEffort == "" {
-					return fmt.Errorf("%w: this profile has no known reasoning-off value", astral.ErrInvalid)
-				}
-				if effort != "" && effort != capabilities.OffEffort {
-					return fmt.Errorf("%w: reasoning-off conflicts with selected effort", astral.ErrInvalid)
-				}
-				effort = capabilities.OffEffort
-			}
-		}
-		if effort != "" {
-			body["reasoning_effort"] = effort
-		}
-	}
-	return nil
 }

@@ -1,5 +1,7 @@
 package completions
 
+import "encoding/json"
+
 type chatReasoningDetail map[string]any
 
 type chatImageURL struct {
@@ -25,8 +27,8 @@ type chatChoice struct {
 }
 
 type chatRespMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
 	// ReasoningContent is a pointer because the key's presence is itself a
 	// signal: DeepSeek returns "" for a thinking-mode step that produced no
 	// reasoning and omits the key when thinking is disabled.
@@ -84,8 +86,8 @@ type chatChunkChoice struct {
 }
 
 type chatChunkDelta struct {
-	Role    string `json:"role,omitempty"`
-	Content string `json:"content,omitempty"`
+	Role    string          `json:"role,omitempty"`
+	Content json.RawMessage `json:"content,omitempty"`
 	// ReasoningContent is a pointer for the same reason as in chatRespMessage:
 	// DeepSeek's first thinking-mode delta carries "" and later deltas null.
 	ReasoningContent *string               `json:"reasoning_content,omitempty"`

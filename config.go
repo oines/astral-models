@@ -37,6 +37,10 @@ type Config struct {
 	ReplayScope string
 	Streaming   *bool
 	Reasoning   *ReasoningCapabilities
+	// ReasoningFormat controls only reasoning parameters, independently of the
+	// connection's other dialect behavior. Empty preserves legacy defaults.
+	ReasoningFormat  ReasoningFormat
+	ReasoningMapping *ReasoningMapping
 	// ReasoningReplay selects the assistant field used by Chat Completions:
 	// reasoning_content, reasoning_details, or reasoning. Empty uses the dialect.
 	ReasoningReplay        string
@@ -53,13 +57,18 @@ type Config struct {
 // Nil means unknown. An empty non-nil Efforts list means no effort control.
 // No implicit low/medium/high list or effort-to-budget mapping is introduced.
 type ReasoningCapabilities struct {
-	Toggle    *bool    `json:"toggle,omitempty"`
-	Disable   *bool    `json:"disable,omitempty"`
-	DefaultOn *bool    `json:"default_on,omitempty"`
-	Efforts   []string `json:"efforts"`
-	MinBudget *int     `json:"min_budget,omitempty"`
-	MaxBudget *int     `json:"max_budget,omitempty"`
-	OffEffort string   `json:"off_effort,omitempty"`
+	Supported     *bool    `json:"supported,omitempty"`
+	Toggle        *bool    `json:"toggle,omitempty"`
+	Disable       *bool    `json:"disable,omitempty"`
+	DefaultOn     *bool    `json:"default_on,omitempty"`
+	DefaultEffort string   `json:"default_effort,omitempty"`
+	Efforts       []string `json:"efforts"`
+	Budget        *bool    `json:"budget,omitempty"`
+	DynamicBudget *bool    `json:"dynamic_budget,omitempty"`
+	MinBudget     *int     `json:"min_budget,omitempty"`
+	MaxBudget     *int     `json:"max_budget,omitempty"`
+	OffEffort     string   `json:"off_effort,omitempty"`
+	OnEffort      string   `json:"on_effort,omitempty"`
 }
 
 // ModelInfo is discovery data, not a claim that a model passed tool/replay tests.

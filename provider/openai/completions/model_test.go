@@ -24,6 +24,69 @@ func request() astral.Request {
 	return astral.Request{ModelID: "profile:1", ModelRevision: "1", MaxOutputTokens: 1000, Messages: []astral.Message{astral.User("hello")}}
 }
 
+func TestStructuredThinkingContentRoundTrip(t *testing.T) {
+	for _, streaming := range []bool{true, false} {
+		t.Run(fmt.Sprint(streaming), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if streaming {
+					w.Header().Set("Content-Type", "text/event-stream")
+					for _, chunk := range []string{
+						`{"id":"native","model":"remote","choices":[{"index":0,"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"look "}],"opaque":9007199254740993}]}}]}`,
+						`{"choices":[{"index":0,"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"up"}],"signature":"retain"},{"type":"text","text":"Looking "}]}}]}`,
+						`{"choices":[{"index":0,"delta":{"content":"now","tool_calls":[{"index":0,"id":"lookup-1","type":"function","function":{"name":"lookup","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`,
+					} {
+						_, _ = fmt.Fprint(w, "data: "+chunk+"\n\n")
+					}
+					_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+				} else {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprint(w, `{"id":"native","model":"remote","choices":[{"index":0,"message":{"role":"assistant","content":[{"type":"thinking","thinking":[{"type":"text","text":"look up"}],"opaque":9007199254740993,"signature":"retain"},{"type":"text","text":"Looking now"}],"tool_calls":[{"id":"lookup-1","type":"function","function":{"name":"lookup","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`)
+				}
+			}))
+			defer server.Close()
+			cfg := config()
+			cfg.BaseURL, cfg.Streaming = server.URL, &streaming
+			m, err := completions.New(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := request()
+			reply, err := m.Stream(context.Background(), req, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(reply.Message.Content) != 3 || reply.Message.Content[0].Type != "reasoning" || reply.Message.Content[0].Text != "look up" || reply.Message.Content[1].Text != "Looking now" {
+				t.Fatalf("wrong native content: %+v", reply.Message.Content)
+			}
+			if reply.Message.FinishReason != astral.FinishToolCalls {
+				t.Fatalf("wrong finish: %+v", reply.Message)
+			}
+			req.Messages = append(req.Messages, reply.Message, astral.Message{Role: astral.RoleTool, ToolCallID: "lookup-1", Content: astral.Text("found")})
+			body, err := m.RequestBody(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := json.Marshal(body)
+			for _, field := range []string{`"signature":"retain"`, `"opaque":9007199254740993`, `"type":"thinking"`, `"tool_call_id":"lookup-1"`} {
+				if !strings.Contains(string(raw), field) {
+					t.Fatalf("lost native replay field %s in %s", field, raw)
+				}
+			}
+			if strings.Contains(string(raw), "reasoning_content") {
+				t.Fatalf("native thinking incorrectly flattened: %s", raw)
+			}
+			cfg.ReplayScope = "another-connection"
+			other, err := completions.New(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := other.RequestBody(req); !errors.Is(err, astral.ErrInvalid) {
+				t.Fatalf("opaque native content crossed route: %v", err)
+			}
+		})
+	}
+}
+
 func TestDialectReasoningControls(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

@@ -58,6 +58,19 @@ func New(config models.Config, protocol string) (*Client, error) {
 			return nil, err
 		}
 	}
+	if config.ReasoningMapping != nil {
+		raw, err := json.Marshal(config.ReasoningMapping)
+		if err != nil {
+			return nil, err
+		}
+		config.ReasoningMapping = new(models.ReasoningMapping)
+		if err := json.Unmarshal(raw, config.ReasoningMapping); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := models.ResolveReasoningControls(protocol, config); err != nil {
+		return nil, err
+	}
 	scope := config.ReplayScope
 	if scope == "" {
 		headers, _ := json.Marshal(config.Headers)
@@ -165,29 +178,16 @@ func (c *Client) Validate(req astral.Request) error {
 			return fmt.Errorf("%w: options for %q cannot be applied to %q", astral.ErrInvalid, namespace, c.Protocol)
 		}
 	}
-	return c.validateReasoning(req.Options.Reasoning)
+	_, err := models.EncodeReasoning(c.Protocol, c.Config, req.Options.Reasoning, req.MaxOutputTokens)
+	return err
 }
 
-func (c *Client) validateReasoning(options astral.ReasoningOptions) error {
-	capabilities := c.Config.Reasoning
-	if capabilities == nil {
-		return nil
+func (c *Client) ApplyReasoning(body map[string]any, req astral.Request) error {
+	encoding, err := models.EncodeReasoning(c.Protocol, c.Config, req.Options.Reasoning, req.MaxOutputTokens)
+	if err != nil {
+		return err
 	}
-	if options.Enabled != nil && capabilities.Toggle != nil && !*capabilities.Toggle {
-		return fmt.Errorf("%w: this model has no reasoning toggle", astral.ErrInvalid)
-	}
-	if options.Enabled != nil && !*options.Enabled && capabilities.Disable != nil && !*capabilities.Disable {
-		return fmt.Errorf("%w: reasoning cannot be disabled for this model", astral.ErrInvalid)
-	}
-	if options.Effort != "" && options.Effort != capabilities.OffEffort && capabilities.Efforts != nil && !slices.Contains(capabilities.Efforts, options.Effort) {
-		return fmt.Errorf("%w: unsupported reasoning effort %q", astral.ErrInvalid, options.Effort)
-	}
-	if budget := options.BudgetTokens; budget != nil {
-		if capabilities.MinBudget != nil && *budget < *capabilities.MinBudget || capabilities.MaxBudget != nil && *budget > *capabilities.MaxBudget {
-			return fmt.Errorf("%w: reasoning budget is outside the supported range", astral.ErrInvalid)
-		}
-	}
-	return nil
+	return merge(body, encoding.Fields, "")
 }
 
 // ApplyExtensions preserves unmodeled native fields but never lets them replace
@@ -199,6 +199,9 @@ func (c *Client) ApplyExtensions(body map[string]any, req astral.Request) error 
 	}
 	extension, err := Object(raw)
 	if err != nil {
+		return err
+	}
+	if err := models.ValidateReasoningExtensions(c.Protocol, c.Config, req.Options.Reasoning, body, extension); err != nil {
 		return err
 	}
 	for key := range extension {

@@ -19,6 +19,10 @@ type stream struct {
 	reasoningContent         *string
 	reasoningText            string
 	details                  []chatReasoningDetail
+	nativeContent            bool
+	nativeParts              map[int][]json.RawMessage
+	nativeIndex              int
+	nativeKind               string
 	usage                    astral.Usage
 	id, model, requestID     string
 	rawFinish                string
@@ -30,7 +34,7 @@ func newStream(c *client.Client, emit func(astral.ModelEvent)) *stream {
 		emit = func(astral.ModelEvent) {}
 	}
 	return &stream{client: c, emit: emit, text: -1, reasoning: -1, refusal: -1,
-		calls: map[int]int{}, arguments: map[int]string{}}
+		calls: map[int]int{}, arguments: map[int]string{}, nativeIndex: -1, nativeParts: map[int][]json.RawMessage{}}
 }
 
 func (s *stream) add(part astral.Content) int {
@@ -101,12 +105,8 @@ func (s *stream) process(chunk chatChunkResponse) error {
 		// This remains live until the terminal event. Encrypted details arriving
 		// after answer text still update the same durable reasoning block.
 	}
-	if delta.Content != "" {
-		if s.text < 0 {
-			s.text = s.add(astral.Content{Type: "text"})
-		}
-		s.parts[s.text].Text += delta.Content
-		s.delta(s.text, "text_delta", delta.Content)
+	if err := s.appendContent(delta.Content); err != nil {
+		return err
 	}
 	if delta.Refusal != "" {
 		if s.refusal < 0 {
@@ -154,6 +154,9 @@ func (s *stream) process(chunk chatChunkResponse) error {
 }
 
 func (s *stream) finish(success bool) (astral.Reply, error) {
+	for index, blocks := range s.nativeParts {
+		s.parts[index].Data, _ = json.Marshal(map[string]any{"content": blocks})
+	}
 	if s.reasoning >= 0 {
 		wire := map[string]any{}
 		if s.reasoningContent != nil {

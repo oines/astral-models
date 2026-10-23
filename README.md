@@ -8,7 +8,7 @@ This is an Astral-focused fork of [Twilight AI](https://github.com/felinics/twil
 
 | Protocol | Dialects | Reasoning controls |
 | --- | --- | --- |
-| Chat Completions | OpenAI, DeepSeek, Qwen, OpenRouter, MiMo, compatible endpoints | Native effort/toggle/budget fields for each dialect |
+| Chat Completions | OpenAI, DeepSeek, Qwen, OpenRouter, MiMo, compatible endpoints | Explicit effort/toggle/budget formats, including Together and Fireworks |
 | Responses | OpenAI, DeepSeek | Native `reasoning.effort`, ordered native-item replay |
 | Anthropic Messages | Anthropic-compatible endpoints | Native thinking blocks, budgets and signed replay |
 | Google GenerateContent | Gemini-compatible endpoints | Native thinking configuration and thought signatures |
@@ -52,13 +52,21 @@ func generate(ctx context.Context) (astral.Reply, error) {
 
 Token limits in this example are configuration values, not a model catalog. Supply verified limits for the selected model. `ListModels` returns discovery identities; it does not assert reasoning, image, tool, or replay support.
 
+## Reasoning controls
+
+Bind `Config.ReasoningFormat` and `Config.Reasoning` to the exact connection, protocol and remote model. `ReasoningFormats(protocol)` lists compatible formats; `ResolveReasoningControls(protocol, config)` returns only selections the same request encoder can execute. The host supplies capability facts and owns profile defaults and session inheritance. An empty `ReasoningOptions` reaches the provider without reasoning parameters, even when capability metadata describes an enabled API default.
+
+`Efforts` is a list of native strings: `nil` means unknown, while `[]` explicitly means no effort selector. `Toggle`, `Disable`, `Budget` and budget bounds describe independent controls. `DefaultEffort` and `DefaultOn` explain API defaults without adding request parameters. `OnEffort` and `OffEffort` explicitly bind on/off to native effort tokens when that route uses them. `ParseReasoningMetadata` extracts sparse capability fields from live model records, preserving explicit null, false and empty lists. It never chooses a request format from the model name.
+
+The `custom` format accepts a bounded `ReasoningMapping` of literal on/off and effort JSON fragments. Fragments cannot modify messages, tools, credentials, routing, output limits or other request-owned fields. Every advertised selection is validated through `EncodeReasoning`, which also powers each provider's `RequestBody`. With an explicit format, `ProviderOptions` cannot bypass the reasoning selection through another managed field; unrelated siblings such as `reasoning.summary` remain available. An omitted format retains legacy dialect behavior for existing callers; new integrations should bind a format explicitly, including `protocol-default` where appropriate.
+
 ## Contracts
 
 - A `Stream` call makes one HTTP attempt and stops emitting before it returns. Core's single `Session` implementation owns retries, tool execution, input queues, compaction, and forks. Ordinary generation and summaries share a total attempt budget; adapters never retry independently.
 - Host code owns credentials, catalogs, profile revisions, default/override selection, media resolution, and capability verification. Bind an immutable provider instance to each profile revision.
 - `GenerationOptions` preserves unset versus explicit zero/false. Effort names remain native values; the adapter does not invent a universal low/medium/high scale or convert effort to a token budget.
 - Protocol-specific JSON belongs under its protocol key in `ProviderOptions`: `openai-completions`, `openai-responses`, `anthropic-messages` or `google-generative-ai`. Conflicting fields and history/stream controls are rejected.
-- Responses items retain original order and opaque JSON, including encrypted reasoning, item/call IDs, annotations, and unknown fields. Native item data is authoritative for replay; parsed text and calls support display and execution, without a second comparison during replay. Chat retains the native reasoning payload, including late encrypted details. Display text cannot replace replay data.
+- Responses items retain original order and opaque JSON, including encrypted reasoning, item/call IDs, annotations, and unknown fields. Native item data is authoritative for replay; parsed text and calls support display and execution, without a second comparison during replay. Chat retains the native reasoning payload, including late encrypted details and structured thinking/text chunks returned by Mistral-compatible routes. Display text cannot replace replay data.
 - Opaque state is bound to protocol, remote model, and replay scope. A route change fails explicitly. Set `ReplayScope` to the Host’s connection/credential revision; otherwise the library derives it from endpoint, key, and configured headers.
 - If a provider explicitly rejects its own encrypted reasoning or signature, `RecoverRequest` offers Core a copy with that opaque replay state removed. Core permits one repair within the same total attempt budget, rechecks its budget, and records both actual requests. Plain text, tool calls and results remain intact; durable history is unchanged. Authentication failures, timeouts and generic validation errors never trigger this removal. Failed stream fragments and retry diagnostics never become subsequent conversation or summary input.
 - Normalized `Usage.InputTokens` includes cached reads/writes; cache fields are breakdowns, not additional input. Provider context-limit errors are exposed to Core as `ModelError.ContextOverflow`, distinct from transient rate/server errors.

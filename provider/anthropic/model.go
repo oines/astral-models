@@ -164,25 +164,11 @@ func (m *Model) RequestBody(req core.Request) (map[string]any, error) {
 		}
 		output["format"] = map[string]any{"type": "json_schema", "schema": f.Schema}
 	}
-	r := o.Reasoning
-	if r.Enabled != nil && !*r.Enabled {
-		if r.BudgetTokens != nil || r.Effort != "" {
-			return nil, fmt.Errorf("%w: disabled thinking conflicts with budget/effort", core.ErrInvalid)
-		}
-		body["thinking"] = map[string]any{"type": "disabled"}
-	} else if r.BudgetTokens != nil {
-		if *r.BudgetTokens < 1024 || *r.BudgetTokens >= req.MaxOutputTokens || r.Effort != "" {
-			return nil, fmt.Errorf("%w: thinking budget must be at least 1024, below max output, and separate from effort", core.ErrInvalid)
-		}
-		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": *r.BudgetTokens}
-	} else if r.Enabled != nil || r.Effort != "" {
-		body["thinking"] = map[string]any{"type": "adaptive"}
-		if r.Effort != "" {
-			output["effort"] = r.Effort
-		}
-	}
 	if len(output) > 0 {
 		body["output_config"] = output
+	}
+	if err := m.client.ApplyReasoning(body, req); err != nil {
+		return nil, err
 	}
 	if err := m.client.ApplyExtensions(body, req); err != nil {
 		return nil, err
