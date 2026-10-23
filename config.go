@@ -41,6 +41,9 @@ type Config struct {
 	// connection's other dialect behavior. Empty preserves legacy defaults.
 	ReasoningFormat  ReasoningFormat
 	ReasoningMapping *ReasoningMapping
+	// ResponsesCompatibility declares verified differences from the standard
+	// Responses request contract. It has no effect on other protocols.
+	ResponsesCompatibility *ResponsesCompatibility
 	// ReasoningReplay selects the assistant field used by Chat Completions:
 	// reasoning_content, reasoning_details, or reasoning. Empty uses the dialect.
 	ReasoningReplay        string
@@ -51,6 +54,18 @@ type Config struct {
 	// Codex selects the subscription Responses endpoint, which requires SSE
 	// and does not expose the public API's max_output_tokens parameter.
 	Codex bool
+}
+
+// ResponsesCompatibility controls optional fields automatically added by the
+// Responses encoder. Nil retains standard behavior. A false capability omits
+// that default and rejects the unsupported field or value in ProviderOptions.
+// This never removes native response items or their encrypted replay data.
+type ResponsesCompatibility struct {
+	SupportsInclude *bool `json:"supports_include,omitempty"`
+	SupportsStore   *bool `json:"supports_store,omitempty"`
+	// SupportsEncryptedReasoningInclude refines SupportsInclude when the
+	// route accepts include but not its reasoning.encrypted_content value.
+	SupportsEncryptedReasoningInclude *bool `json:"supports_encrypted_reasoning_include,omitempty"`
 }
 
 // ReasoningCapabilities describes a specific connection/protocol/model route.

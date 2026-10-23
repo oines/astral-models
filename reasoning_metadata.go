@@ -58,8 +58,85 @@ func ParseReasoningMetadata(source string, raw json.RawMessage) (map[string]json
 		}
 		return nil
 	}
+	readBool := func(fields map[string]json.RawMessage, key, target string) error {
+		if string(fields[key]) == "null" {
+			put(target, nil)
+			return nil
+		}
+		var value bool
+		if found, err := read(fields, key, &value); err != nil {
+			return err
+		} else if found {
+			put(target, value)
+		}
+		return nil
+	}
+	if source == "magpie" {
+		if err := readBool(record, "reasoning", "supported"); err != nil {
+			return nil, err
+		}
+		// The string list and object list name the same native
+		// vocabulary. An explicitly present object list takes precedence.
+		if _, present := record["supported_reasoning_levels"]; !present {
+			if err := readEfforts(record, "reasoning_levels"); err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	switch source {
+	case "floway":
+		var chat, info map[string]json.RawMessage
+		if _, err := read(record, "chat", &chat); err != nil {
+			return nil, err
+		}
+		if string(chat["reasoning"]) == "null" {
+			put("supported", nil)
+			return out, nil
+		}
+		if present, err := read(chat, "reasoning", &info); err != nil {
+			return nil, err
+		} else if !present {
+			return out, nil
+		}
+		put("supported", true)
+		var effort, budget map[string]json.RawMessage
+		if _, err := read(info, "effort", &effort); err != nil {
+			return nil, err
+		}
+		if err := readEfforts(effort, "supported"); err != nil {
+			return nil, err
+		}
+		if err := readDefault(effort, "default"); err != nil {
+			return nil, err
+		}
+		if string(info["budget_tokens"]) == "null" {
+			put("budget", nil)
+		} else if present, err := read(info, "budget_tokens", &budget); err != nil {
+			return nil, err
+		} else if present {
+			put("budget", true)
+			for _, bound := range []string{"min", "max"} {
+				var value int
+				if string(budget[bound]) == "null" {
+					put(bound+"_budget", nil)
+				} else if found, err := read(budget, bound, &value); err != nil {
+					return nil, err
+				} else if found {
+					put(bound+"_budget", value)
+				}
+			}
+		}
+		var mandatory bool
+		if _, err := read(info, "mandatory", &mandatory); err != nil {
+			return nil, err
+		} else if mandatory {
+			put("toggle", false)
+			put("disable", false)
+			put("default_on", true)
+		}
+		// adaptive describes model-controlled depth; it is not Gemini's
+		// negative budget sentinel and does not prove a user-facing toggle.
 	case "openrouter":
 		var info map[string]json.RawMessage
 		present, err := read(record, "reasoning", &info)

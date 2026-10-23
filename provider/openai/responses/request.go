@@ -45,9 +45,16 @@ func (m *Model) RequestBody(req astral.Request) (map[string]any, error) {
 		}
 	}
 	body := map[string]any{
-		"model": m.client.Config.Model, "input": input, "store": false,
+		"model": m.client.Config.Model, "input": input,
 		"stream": m.client.Streaming(), "max_output_tokens": req.MaxOutputTokens,
-		"include": []string{"reasoning.encrypted_content"},
+	}
+	compatibility := m.client.Config.ResponsesCompatibility
+	if compatibility == nil || compatibility.SupportsStore == nil || *compatibility.SupportsStore {
+		body["store"] = false
+	}
+	if compatibility == nil || ((compatibility.SupportsInclude == nil || *compatibility.SupportsInclude) &&
+		(compatibility.SupportsEncryptedReasoningInclude == nil || *compatibility.SupportsEncryptedReasoningInclude)) {
+		body["include"] = []string{"reasoning.encrypted_content"}
 	}
 	if req.SystemPrompt != "" {
 		body["instructions"] = req.SystemPrompt

@@ -48,6 +48,22 @@ func New(config models.Config, protocol string) (*Client, error) {
 		value := *config.Streaming
 		config.Streaming = &value
 	}
+	if compatibility := config.ResponsesCompatibility; compatibility != nil {
+		copy := *compatibility
+		if compatibility.SupportsInclude != nil {
+			value := *compatibility.SupportsInclude
+			copy.SupportsInclude = &value
+		}
+		if compatibility.SupportsStore != nil {
+			value := *compatibility.SupportsStore
+			copy.SupportsStore = &value
+		}
+		if compatibility.SupportsEncryptedReasoningInclude != nil {
+			value := *compatibility.SupportsEncryptedReasoningInclude
+			copy.SupportsEncryptedReasoningInclude = &value
+		}
+		config.ResponsesCompatibility = &copy
+	}
 	if config.Reasoning != nil {
 		raw, err := json.Marshal(config.Reasoning)
 		if err != nil {
@@ -200,6 +216,21 @@ func (c *Client) ApplyExtensions(body map[string]any, req astral.Request) error 
 	extension, err := Object(raw)
 	if err != nil {
 		return err
+	}
+	if compatibility := c.Config.ResponsesCompatibility; c.Protocol == "openai-responses" && compatibility != nil {
+		for key, supported := range map[string]*bool{"include": compatibility.SupportsInclude, "store": compatibility.SupportsStore} {
+			if _, explicit := extension[key]; explicit && supported != nil && !*supported {
+				return fmt.Errorf("%w: provider extension %q is unsupported by this Responses route", astral.ErrInvalid, key)
+			}
+		}
+		if supported := compatibility.SupportsEncryptedReasoningInclude; supported != nil && !*supported {
+			values, _ := extension["include"].([]any)
+			for _, value := range values {
+				if value, ok := value.(string); ok && value == "reasoning.encrypted_content" {
+					return fmt.Errorf("%w: provider extension include value %q is unsupported by this Responses route", astral.ErrInvalid, value)
+				}
+			}
+		}
 	}
 	if err := models.ValidateReasoningExtensions(c.Protocol, c.Config, req.Options.Reasoning, body, extension); err != nil {
 		return err
