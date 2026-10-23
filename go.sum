@@ -14,6 +14,8 @@ github.com/oines/astral-core v0.0.0-20261021164907-a0cb8b3525af h1:5Dg8ejKyHXqRT
 github.com/oines/astral-core v0.0.0-20261021164907-a0cb8b3525af/go.mod h1:U3ERvZRC6nstFf1DKCw0D45MchoXmcykwNzQlBOkxKo=
 github.com/oines/astral-core v0.0.0-20261023033827-cfd7c00af22a h1:GNND2oQdEOuPW/JnSgZi9ovWEJ8Hhs0G2x0M4RPLMwc=
 github.com/oines/astral-core v0.0.0-20261023033827-cfd7c00af22a/go.mod h1:U3ERvZRC6nstFf1DKCw0D45MchoXmcykwNzQlBOkxKo=
+github.com/oines/astral-core v0.0.0-20261023034305-15b7220f37d8 h1:0Dr4dCJdCqOvY5aYaTTj4SKQMLml6TrjsppkllhsKpo=
+github.com/oines/astral-core v0.0.0-20261023034305-15b7220f37d8/go.mod h1:U3ERvZRC6nstFf1DKCw0D45MchoXmcykwNzQlBOkxKo=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 h1:KRzFb2m7YtdldCEkzs6KqmJw4nqEVZGK7IN2kJkjTuQ=
