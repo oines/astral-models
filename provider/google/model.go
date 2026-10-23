@@ -32,15 +32,22 @@ func New(config models.Config) (*Model, error) {
 	return &Model{client: c}, nil
 }
 func (m *Model) Spec() core.ModelSpec { return m.client.Spec() }
+func (m *Model) ValidateRequest(ctx context.Context, req core.Request) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := m.RequestBody(req)
+	return err
+}
+
 func (m *Model) EstimateTokens(ctx context.Context, req core.Request) (int, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	body, err := m.RequestBody(req)
-	if err != nil {
+	if err := m.client.Validate(req); err != nil {
 		return 0, err
 	}
-	return m.client.Estimate(body, req)
+	return m.client.Estimate(req)
 }
 func str(m map[string]any, k string) string { v, _ := m[k].(string); return v }
 

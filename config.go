@@ -41,8 +41,8 @@ type Config struct {
 	// reasoning_content, reasoning_details, or reasoning. Empty uses the dialect.
 	ReasoningReplay        string
 	RequireReasoningReplay bool
-	// ImageTokenBudget is the host's conservative per-image input reservation.
-	// Estimation refuses images unless an explicit positive budget is supplied.
+	// ImageTokenBudget overrides the content estimator's 1200-token image
+	// approximation. Encoded image bytes are never counted as text tokens.
 	ImageTokenBudget int
 	// Codex selects the subscription Responses endpoint, which requires SSE
 	// and does not expose the public API's max_output_tokens parameter.

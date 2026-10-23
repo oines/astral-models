@@ -23,8 +23,13 @@ func ModelError(err error) error {
 	var api *APIError
 	if errors.As(err, &api) {
 		after, _ := api.RetryAfter()
+		kind := api.Kind
+		overflow := IsContextOverflow(api)
+		if overflow {
+			kind = KindContextOverflow
+		}
 		return &astral.ModelError{
-			Code: string(api.Kind), Message: api.Error(), Cause: api,
+			Code: string(kind), ContextOverflow: overflow, Message: api.Error(), Cause: api,
 			Transient:  api.Kind == KindRateLimited || api.Kind == KindServerError,
 			RetryAfter: after,
 		}

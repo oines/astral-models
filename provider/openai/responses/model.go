@@ -44,15 +44,22 @@ func (m *Model) ListModels(ctx context.Context) ([]models.ModelInfo, error) {
 	return m.client.ListModels(ctx)
 }
 
+func (m *Model) ValidateRequest(ctx context.Context, req astral.Request) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := m.RequestBody(req)
+	return err
+}
+
 func (m *Model) EstimateTokens(ctx context.Context, req astral.Request) (int, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	body, err := m.RequestBody(req)
-	if err != nil {
+	if err := m.client.Validate(req); err != nil {
 		return 0, err
 	}
-	return m.client.Estimate(body, req)
+	return m.client.Estimate(req)
 }
 
 func (m *Model) Stream(ctx context.Context, req astral.Request, emit func(astral.ModelEvent)) (astral.Reply, error) {

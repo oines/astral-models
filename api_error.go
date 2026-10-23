@@ -142,6 +142,8 @@ const (
 	// KindUnknown means the SDK has no classification for the failure.
 	// StatusCode, Type and Code are still available.
 	KindUnknown ErrorKind = "unknown"
+	// KindContextOverflow means input exceeds the provider context/token limit.
+	KindContextOverflow ErrorKind = "context_overflow"
 	// KindAuthentication means the credentials are missing, invalid or
 	// expired.
 	KindAuthentication ErrorKind = "authentication"
