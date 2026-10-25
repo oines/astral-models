@@ -59,15 +59,7 @@ func (s *stream) process(chunk chatChunkResponse) error {
 		s.id, s.model = chunk.ID, chunk.Model
 	}
 	if chunk.Usage != nil {
-		s.usage = astral.Usage{InputTokens: chunk.Usage.PromptTokens, OutputTokens: chunk.Usage.CompletionTokens, Available: true}
-		if chunk.Usage.PromptTokensDetails != nil {
-			value := chunk.Usage.PromptTokensDetails.CachedTokens
-			s.usage.CachedInputTokens = &value
-		}
-		if chunk.Usage.CompletionTokensDetails != nil {
-			value := chunk.Usage.CompletionTokensDetails.ReasoningTokens
-			s.usage.ReasoningTokens = &value
-		}
+		s.usage = chunk.Usage.Chat()
 	}
 	if len(chunk.Choices) == 0 {
 		return nil

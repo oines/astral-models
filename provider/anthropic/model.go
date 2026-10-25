@@ -182,7 +182,7 @@ type message struct {
 	Role       string           `json:"role"`
 	Content    []map[string]any `json:"content"`
 	StopReason string           `json:"stop_reason"`
-	Usage      usage            `json:"usage"`
+	Usage      *usage           `json:"usage"`
 }
 type usage struct {
 	Input  *int `json:"input_tokens"`
@@ -203,7 +203,7 @@ type event struct {
 		JSON       string `json:"partial_json"`
 		StopReason string `json:"stop_reason"`
 	} `json:"delta"`
-	Usage usage `json:"usage"`
+	Usage *usage `json:"usage"`
 }
 
 func str(m map[string]any, key string) string { value, _ := m[key].(string); return value }
@@ -237,14 +237,21 @@ func (m *Model) Stream(ctx context.Context, req core.Request, emit func(core.Mod
 	}
 	var wire message
 	var resultUsage core.Usage
-	applyUsage := func(u usage) {
+	applyUsage := func(u *usage) {
+		if u == nil {
+			return
+		}
+		if !resultUsage.Available {
+			resultUsage.InputMissing, resultUsage.OutputMissing = true, true
+		}
+		resultUsage.Available = true
 		if u.Input != nil {
 			resultUsage.InputTokens = *u.Input
-			resultUsage.Available = true
+			resultUsage.InputMissing = false
 		}
 		if u.Output != nil {
 			resultUsage.OutputTokens = *u.Output
-			resultUsage.Available = true
+			resultUsage.OutputMissing = false
 		}
 		if u.Read != nil {
 			resultUsage.CachedInputTokens = u.Read

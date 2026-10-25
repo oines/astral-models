@@ -212,8 +212,8 @@ type response struct {
 		FinishReason string `json:"finishReason"`
 	} `json:"candidates"`
 	Usage *struct {
-		Input    int  `json:"promptTokenCount"`
-		Output   int  `json:"candidatesTokenCount"`
+		Input    *int `json:"promptTokenCount"`
+		Output   *int `json:"candidatesTokenCount"`
 		Thoughts *int `json:"thoughtsTokenCount"`
 		Cached   *int `json:"cachedContentTokenCount"`
 	} `json:"usageMetadata"`
@@ -244,7 +244,14 @@ func (m *Model) Stream(ctx context.Context, req core.Request, emit func(core.Mod
 		}
 		if v.Usage != nil {
 			u := v.Usage
-			reply.Usage = core.Usage{InputTokens: u.Input, OutputTokens: u.Output, Available: true, CachedInputTokens: u.Cached, ReasoningTokens: u.Thoughts}
+			reply.Usage = core.Usage{Available: true, InputMissing: u.Input == nil, OutputMissing: u.Output == nil,
+				CachedInputTokens: u.Cached, ReasoningTokens: u.Thoughts}
+			if u.Input != nil {
+				reply.Usage.InputTokens = *u.Input
+			}
+			if u.Output != nil {
+				reply.Usage.OutputTokens = *u.Output
+			}
 			if u.Thoughts != nil {
 				reply.Usage.OutputTokens += *u.Thoughts
 			}

@@ -9,22 +9,14 @@ import (
 	astral "github.com/oines/astral-core"
 	"github.com/oines/astral-models/internal/client"
 	"github.com/oines/astral-models/internal/errorformat"
+	"github.com/oines/astral-models/internal/usage"
 	"github.com/oines/astral-models/internal/utils"
 )
 
 type response struct {
 	ID, Model, Status string
-	Output            []json.RawMessage `json:"output"`
-	Usage             *struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
-		InputDetails *struct {
-			CachedTokens *int `json:"cached_tokens"`
-		} `json:"input_tokens_details"`
-		OutputDetails *struct {
-			ReasoningTokens *int `json:"reasoning_tokens"`
-		} `json:"output_tokens_details"`
-	} `json:"usage"`
+	Output            []json.RawMessage        `json:"output"`
+	Usage             *usage.OpenAI            `json:"usage"`
 	IncompleteDetails *struct{ Reason string } `json:"incomplete_details"`
 	Error             json.RawMessage          `json:"error"`
 }
@@ -170,13 +162,7 @@ func (s *stream) complete(value response) error {
 	}
 	s.id, s.model, s.status = value.ID, value.Model, value.Status
 	if value.Usage != nil {
-		s.usage = astral.Usage{InputTokens: value.Usage.InputTokens, OutputTokens: value.Usage.OutputTokens, Available: true}
-		if value.Usage.InputDetails != nil {
-			s.usage.CachedInputTokens = value.Usage.InputDetails.CachedTokens
-		}
-		if value.Usage.OutputDetails != nil {
-			s.usage.ReasoningTokens = value.Usage.OutputDetails.ReasoningTokens
-		}
+		s.usage = value.Usage.Responses()
 	}
 	if value.Output != nil {
 		for index := range s.items {

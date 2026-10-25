@@ -1,6 +1,10 @@
 package completions
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/oines/astral-models/internal/usage"
+)
 
 type chatReasoningDetail map[string]any
 
@@ -51,22 +55,7 @@ type chatFunctionCall struct {
 	Arguments string `json:"arguments"`
 }
 
-type chatUsage struct {
-	PromptTokens            int                         `json:"prompt_tokens"`
-	CompletionTokens        int                         `json:"completion_tokens"`
-	TotalTokens             int                         `json:"total_tokens"`
-	PromptTokensDetails     *chatPromptTokenDetails     `json:"prompt_tokens_details,omitempty"`
-	CompletionTokensDetails *chatCompletionTokenDetails `json:"completion_tokens_details,omitempty"`
-}
-
-type chatPromptTokenDetails struct {
-	CachedTokens int `json:"cached_tokens"`
-}
-
-type chatCompletionTokenDetails struct {
-	ReasoningTokens int `json:"reasoning_tokens"`
-	TextTokens      int `json:"text_tokens"`
-}
+type chatUsage = usage.OpenAI
 
 // --- Streaming chunk types (chat.completion.chunk) ---
 
