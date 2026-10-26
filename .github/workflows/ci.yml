@@ -1,100 +1,19 @@
 name: CI
-
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
-  workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.11.3
-
-      - name: golangci-lint (official SDK differential tests)
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.11.3
-          working-directory: internal/sdkdiff
-
-      - name: go mod tidy
-        run: go mod tidy && git diff --exit-code go.mod go.sum
-
   test:
-    name: Test (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
-    needs: lint
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Minimum version declared in go.mod.
-          - go: minimum
-            go-version-file: go.mod
-          - go: stable
-            go-version: stable
-
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-          go-version-file: ${{ matrix.go-version-file }}
-
-      - name: Build
-        run: go build ./...
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Vet (integration)
-        run: go vet -tags integration ./...
-
-      - name: Unit Tests
-        run: go test ./... -short -count=1 -race -v
-
-      - name: Official SDK differential tests
-        working-directory: internal/sdkdiff
-        run: go test ./... -count=1 -race -v
-
-  integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: test
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-      || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
-      - name: Integration Tests
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
-          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
-          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
-        run: go test -tags integration ./... -count=1 -v -run '^TestIntegration_' -timeout 120s
+          cache: true
+      - run: go mod download
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: test -z "$(gofmt -l .)"

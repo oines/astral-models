@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/felinics/twilight/sdk"
+	sdk "github.com/oines/astral-models"
 )
 
 // openAIError is the error object of OpenAI's format. OpenAI-compatible APIs

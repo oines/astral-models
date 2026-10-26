@@ -103,13 +103,22 @@ func FetchJSONBody[T any](ctx context.Context, client *http.Client, opts *Reques
 		return nil, nil, nil, NewHTTPError(opts.Provider, resp, opts.DecodeError)
 	}
 
-	body, err = io.ReadAll(resp.Body)
+	const maxResponseBytes = 32 << 20
+	body, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("read response: %w", err)
 	}
+	if len(body) > maxResponseBytes {
+		return nil, nil, nil, fmt.Errorf("response exceeds %d bytes", maxResponseBytes)
+	}
 	result = new(T)
-	if err := json.NewDecoder(bytes.NewReader(body)).Decode(result); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(result); err != nil {
 		return nil, nil, nil, fmt.Errorf("decode response: %w", err)
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, nil, nil, fmt.Errorf("response must contain exactly one JSON value")
 	}
 	return result, resp.Header, body, nil
 }

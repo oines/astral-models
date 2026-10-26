@@ -67,6 +67,7 @@ func FetchSSE(ctx context.Context, client *http.Client, opts *RequestOptions, on
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	event := &SSEEvent{Header: resp.Header}
 	var dataLines []string
+	eventBytes := 0
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -82,6 +83,7 @@ func FetchSSE(ctx context.Context, client *http.Client, opts *RequestOptions, on
 				}
 				event = &SSEEvent{Header: resp.Header}
 				dataLines = nil
+				eventBytes = 0
 			}
 			continue
 		}
@@ -100,6 +102,10 @@ func FetchSSE(ctx context.Context, client *http.Client, opts *RequestOptions, on
 		case "event":
 			event.Event = value
 		case "data":
+			eventBytes += len(value) + 1
+			if eventBytes > 10*1024*1024 {
+				return fmt.Errorf("SSE event exceeds 10 MiB")
+			}
 			dataLines = append(dataLines, value)
 		case "id":
 			event.ID = value

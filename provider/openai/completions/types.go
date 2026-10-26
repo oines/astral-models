@@ -1,95 +1,12 @@
 package completions
 
-// --- Request types ---
+import (
+	"encoding/json"
 
-type chatRequest struct {
-	Model               string             `json:"model"`
-	Messages            []chatMessage      `json:"messages"`
-	Tools               []chatTool         `json:"tools,omitempty"`
-	ToolChoice          any                `json:"tool_choice,omitempty"`
-	ResponseFormat      *chatRespFormat    `json:"response_format,omitempty"`
-	Temperature         *float64           `json:"temperature,omitempty"`
-	TopP                *float64           `json:"top_p,omitempty"`
-	MaxCompletionTokens *int               `json:"max_completion_tokens,omitempty"`
-	Stop                []string           `json:"stop,omitempty"`
-	FrequencyPenalty    *float64           `json:"frequency_penalty,omitempty"`
-	PresencePenalty     *float64           `json:"presence_penalty,omitempty"`
-	Seed                *int               `json:"seed,omitempty"`
-	ReasoningEffort     *string            `json:"reasoning_effort,omitempty"`
-	PromptCacheKey      *string            `json:"prompt_cache_key,omitempty"`
-	Thinking            *chatThinking      `json:"thinking,omitempty"`
-	ReasoningSplit      bool               `json:"reasoning_split,omitempty"`
-	Stream              bool               `json:"stream,omitempty"`
-	StreamOptions       *chatStreamOptions `json:"stream_options,omitempty"`
-}
-
-type chatThinking struct {
-	Type string `json:"type"`
-}
-
-type chatStreamOptions struct {
-	IncludeUsage bool `json:"include_usage"`
-}
-
-type chatRespFormat struct {
-	Type       string              `json:"type"`
-	JSONSchema *chatRespJSONSchema `json:"json_schema,omitempty"`
-}
-
-// chatRespJSONSchema is the Chat Completions json_schema wrapper. The schema
-// itself is nested under "schema" next to a required "name"; sending the bare
-// schema as json_schema is rejected by strict OpenAI-compatible upstreams.
-// strict is left unset, matching the Responses provider's text.format.
-type chatRespJSONSchema struct {
-	Name   string `json:"name"`
-	Schema any    `json:"schema"`
-}
-
-type chatTool struct {
-	Type     string       `json:"type"`
-	Function chatFunction `json:"function"`
-}
-
-type chatFunction struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Parameters  any    `json:"parameters,omitempty"`
-}
-
-type chatMessage struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"`
-	// ReasoningContent is a pointer so an empty reasoning block can be sent as
-	// "" instead of being dropped: DeepSeek and Kimi thinking modes validate
-	// the key's presence on replayed tool-call messages, not its length.
-	ReasoningContent *string               `json:"reasoning_content,omitempty"`
-	Reasoning        *string               `json:"reasoning,omitempty"`
-	ReasoningDetails []chatReasoningDetail `json:"reasoning_details,omitempty"`
-	ToolCalls        []chatToolCall        `json:"tool_calls,omitempty"`
-	ToolCallID       string                `json:"tool_call_id,omitempty"`
-}
+	"github.com/oines/astral-models/internal/usage"
+)
 
 type chatReasoningDetail map[string]any
-
-type chatContentPartText struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-type chatContentPartImage struct {
-	Type     string       `json:"type"`
-	ImageURL chatImageURL `json:"image_url"`
-}
-
-type chatContentPartFile struct {
-	Type string   `json:"type"`
-	File chatFile `json:"file"`
-}
-
-type chatFile struct {
-	Filename string `json:"filename,omitempty"`
-	FileData string `json:"file_data"`
-}
 
 type chatImageURL struct {
 	URL    string `json:"url"`
@@ -114,8 +31,8 @@ type chatChoice struct {
 }
 
 type chatRespMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
 	// ReasoningContent is a pointer because the key's presence is itself a
 	// signal: DeepSeek returns "" for a thinking-mode step that produced no
 	// reasoning and omits the key when thinking is disabled.
@@ -138,22 +55,7 @@ type chatFunctionCall struct {
 	Arguments string `json:"arguments"`
 }
 
-type chatUsage struct {
-	PromptTokens            int                         `json:"prompt_tokens"`
-	CompletionTokens        int                         `json:"completion_tokens"`
-	TotalTokens             int                         `json:"total_tokens"`
-	PromptTokensDetails     *chatPromptTokenDetails     `json:"prompt_tokens_details,omitempty"`
-	CompletionTokensDetails *chatCompletionTokenDetails `json:"completion_tokens_details,omitempty"`
-}
-
-type chatPromptTokenDetails struct {
-	CachedTokens int `json:"cached_tokens"`
-}
-
-type chatCompletionTokenDetails struct {
-	ReasoningTokens int `json:"reasoning_tokens"`
-	TextTokens      int `json:"text_tokens"`
-}
+type chatUsage = usage.OpenAI
 
 // --- Streaming chunk types (chat.completion.chunk) ---
 
@@ -173,8 +75,8 @@ type chatChunkChoice struct {
 }
 
 type chatChunkDelta struct {
-	Role    string `json:"role,omitempty"`
-	Content string `json:"content,omitempty"`
+	Role    string          `json:"role,omitempty"`
+	Content json.RawMessage `json:"content,omitempty"`
 	// ReasoningContent is a pointer for the same reason as in chatRespMessage:
 	// DeepSeek's first thinking-mode delta carries "" and later deltas null.
 	ReasoningContent *string               `json:"reasoning_content,omitempty"`
@@ -200,17 +102,4 @@ type chatToolCallChunk struct {
 type chatFunctionDelta struct {
 	Name      string `json:"name,omitempty"`
 	Arguments string `json:"arguments,omitempty"`
-}
-
-// --- Models API response types ---
-
-type modelsListResponse struct {
-	Data []modelObject `json:"data"`
-}
-
-type modelObject struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int64  `json:"created"`
-	OwnedBy string `json:"owned_by"`
 }

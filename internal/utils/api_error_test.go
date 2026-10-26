@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/felinics/twilight/sdk"
+	sdk "github.com/oines/astral-models"
 )
 
 const testErrorBody = `{"error":{"code":"insufficient_quota","message":"out of credit"}}`
